@@ -1,0 +1,40 @@
+---
+- name: Ensure Arexibo system directories exist in /opt
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ xibo_display_user }}"
+    group: "{{ xibo_display_user }}"
+    mode: "0755"
+  loop:
+    - "/opt/arexibo"
+    - "{{ arexibo_install_dir }}"
+    - "{{ arexibo_media_dir }}"
+  become: true
+
+- name: Ensure Openbox user config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ xibo_display_user }}/.config/openbox"
+    state: directory
+    owner: "{{ xibo_display_user }}"
+    group: "{{ xibo_display_user }}"
+    mode: "0755"
+  become: true
+
+- name: Deploy pre-compiled Arexibo binary
+  ansible.builtin.copy:
+    src: arexibo
+    dest: "{{ arexibo_install_dir }}/arexibo"
+    owner: "{{ xibo_display_user }}"
+    group: "{{ xibo_display_user }}"
+    mode: "0755"
+  become: true
+
+- name: Deploy Openbox autostart configuration
+  ansible.builtin.template:
+    src: autostart.j2
+    dest: "/home/{{ xibo_display_user }}/.config/openbox/autostart"
+    owner: "{{ xibo_display_user }}"
+    group: "{{ xibo_display_user }}"
+    mode: "0700"
+  become: true

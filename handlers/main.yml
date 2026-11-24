@@ -1,0 +1,17 @@
+---
+- name: Reload systemd daemon
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+
+- name: Rebuild Dracut initramfs
+  ansible.builtin.command:
+    cmd: dracut -f
+  changed_when: true
+  become: true
+
+- name: Update GRUB
+  ansible.builtin.command:
+    cmd: update-grub
+  changed_when: true
+  become: true

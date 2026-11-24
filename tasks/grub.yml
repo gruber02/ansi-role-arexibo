@@ -1,0 +1,41 @@
+---
+- name: Check if GRUB superuser configuration already exists
+  ansible.builtin.stat:
+    path: /etc/grub.d/01_users
+  register: _grub_users_file
+  become: true
+
+- name: Generate PBKDF2 hash from plaintext password securely
+  ansible.builtin.command:
+    cmd: grub-mkpasswd-pbkdf2
+    stdin: "{{ arexibo_grub_pw }}\n{{ arexibo_grub_pw }}\n"
+  register: _grub_hash_cmd
+  changed_when: false
+  when: not _grub_users_file.stat.exists or (arexibo_grub_force_update | bool)
+  become: true
+  no_log: true
+
+- name: Extract PBKDF2 hash from command output
+  ansible.builtin.set_fact:
+    _grub_hash: "{{ _grub_hash_cmd.stdout | regex_search('grub\\.pbkdf2\\.\\S+') }}"
+  when: not _grub_users_file.stat.exists or (arexibo_grub_force_update | bool)
+  no_log: true
+
+- name: Deploy GRUB custom user configuration for the superuser
+  ansible.builtin.template:
+    src: 01_users.j2
+    dest: /etc/grub.d/01_users
+    owner: root
+    group: root
+    mode: "0700"
+  when: not _grub_users_file.stat.exists or (arexibo_grub_force_update | bool)
+  notify: Update GRUB
+  become: true
+
+- name: Ensure normal OS booting remains unrestricted
+  ansible.builtin.replace:
+    path: /etc/grub.d/10_linux
+    regexp: '^(CLASS=".*--class os)(?!.*\b--unrestricted\b)(")$'
+    replace: '\1 --unrestricted\2'
+  notify: Update GRUB
+  become: true

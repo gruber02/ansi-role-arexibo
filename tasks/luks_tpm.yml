@@ -1,0 +1,66 @@
+---
+- name: Install Dracut and TPM2 tooling
+  ansible.builtin.apt:
+    name:
+      - tpm2-tools
+      - dracut
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: Read /etc/crypttab to identify encrypted partition
+  ansible.builtin.slurp:
+    src: /etc/crypttab
+  register: _crypttab_raw
+  become: true
+
+- name: Parse encrypted device path from crypttab
+  ansible.builtin.set_fact:
+    _luks_target_device: >-
+      {{
+        (_crypttab_raw.content | b64decode).splitlines()
+        | select('match', '^[a-zA-Z0-9_-]+\\s+')
+        | map('regex_replace', '^[a-zA-Z0-9_-]+\\s+(\\S+)\\s+.*', '\1')
+        | map('regex_replace', '^UUID=(.*)', '/dev/disk/by-uuid/\1')
+        | first
+      }}
+
+- name: Check if TPM2 is already enrolled in LUKS header
+  ansible.builtin.command:
+    cmd: "cryptsetup luksDump {{ _luks_target_device }}"
+  register: _luks_dump
+  changed_when: false
+  become: true
+
+- name: Enroll TPM2 device into LUKS keyslot
+  # Note: On a fresh host without an existing keyfile, supply PASSWORD via
+  # environment: (with no_log: true) or pass --unlock-key-file so this doesn't prompt.
+  ansible.builtin.command:
+    cmd: "systemd-cryptenroll --tpm2-device=auto {{ _luks_target_device }}"
+  when: "'systemd-tpm2' not in _luks_dump.stdout"
+  changed_when: true
+  become: true
+
+- name: Ensure crypttab includes discard and tpm2-device=auto options
+  ansible.builtin.replace:
+    path: /etc/crypttab
+    regexp: '^(?!#)(?P<prefix>\S+\s+\S+\s+\S+\s+)(?P<opts>(?!.*\b{{ item | regex_escape }}\b)\S+.*)$'
+    replace: '\g<prefix>\g<opts>,{{ item }}'
+  loop:
+    - discard
+    - tpm2-device=auto
+  notify: Rebuild Dracut initramfs
+  become: true
+
+- name: Configure Dracut for TPM2 modules and hostonly mode
+  ansible.builtin.copy:
+    dest: /etc/dracut.conf.d/tpm2.conf
+    content: |
+      hostonly="yes"
+      add_dracutmodules+=" tpm2-tss "
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Rebuild Dracut initramfs
+  become: true

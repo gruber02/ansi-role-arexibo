@@ -1,0 +1,14 @@
+---
+- name: Include GUI and system prerequisite tasks
+  ansible.builtin.import_tasks: gui.yml
+
+- name: Include Arexibo client setup tasks
+  ansible.builtin.import_tasks: arexibo.yml
+
+- name: Include LUKS TPM2 Dracut configuration tasks
+  ansible.builtin.import_tasks: luks_tpm.yml
+  when: arexibo_enable_tpm_luks | bool
+
+- name: Include GRUB bootloader hardening tasks
+  ansible.builtin.import_tasks: grub.yml
+  when: arexibo_grub_pw | length > 0

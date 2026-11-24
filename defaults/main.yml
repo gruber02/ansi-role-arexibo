@@ -1,0 +1,22 @@
+---
+# User Configuration
+xibo_display_user: "xi"
+
+# Xibo CMS Server Connection Details
+xibo_cms_host: "http://10.203.225.xxx"
+xibo_cms_key: "YourSecretCmsKey"
+
+# Paths
+arexibo_install_dir: "/opt/arexibo/bin"
+arexibo_media_dir: "/opt/arexibo/media"
+
+# Feature Flags
+arexibo_enable_tpm_luks: true
+
+# Bootloader Security
+# Define the actual plaintext password in group_vars/all/all.yml (encrypted with Ansible Vault!)
+arexibo_grub_pw: "rtrk3.10kMP"
+arexibo_grub_force_update: false
+
+
+

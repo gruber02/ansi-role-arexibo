@@ -1,0 +1,53 @@
+---
+- name: Install minimal GUI and Arexibo runtime shared libraries
+  ansible.builtin.apt:
+    name:
+      - xserver-xorg
+      - x11-xserver-utils
+      - xinit
+      - openbox
+      - libzmq5
+      - libqt6webenginecore6
+      - libqt6webenginewidgets6
+      - qt6-wayland
+    state: present
+    install_recommends: false
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: Create systemd drop-in directory for getty@tty1
+  ansible.builtin.file:
+    path: /etc/systemd/system/getty@tty1.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Configure TTY1 auto-login override
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/getty@tty1.service.d/override.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=-/sbin/agetty --autologin {{ xibo_display_user }} --noclear %I $TERM
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd daemon
+  become: true
+
+- name: Configure X11 auto-launch in bash_profile
+  ansible.builtin.blockinfile:
+    path: "/home/{{ xibo_display_user }}/.bash_profile"
+    create: true
+    owner: "{{ xibo_display_user }}"
+    group: "{{ xibo_display_user }}"
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - arexibo"
+    block: |
+      if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
+          exec startx
+      fi
+  become: true
